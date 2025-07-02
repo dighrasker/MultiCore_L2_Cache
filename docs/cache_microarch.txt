@@ -1,0 +1,59 @@
+## Design Decisions
+
+- I am building a writeback L2 cache for a multi-core, 32-bit RISC-V Processor. It will follow the MESI protocol for coherence and use the AXI4 interface to communicate with DRAM
+- Specifications on how the L2 cache will communicate with the L1 cache
+    - Each core will have its own L1 cache. The L2 cache will be inclusive of all the cores’ L1 caches
+        - important design decision: had to weigh tradeoffs between cache area utilization and coherence simplification
+    - Size of the L2 cache must be ≥ N * size of L1 cache
+    - If an instruction misses in the L1 cache, it goes and cam’s the L2 cache.
+    - Cache sizing:
+        - I am planning on making all the L1 caches private and 32KB each. I am planning on making one shared L2 cache which is 512KB.
+        - Each cache line will be 64 bytes in size
+        - My L1 cache will 4-way set associative. That means each set is 2^8 bytes in size ⇒ there will be 128 sets in the L1 cache.
+            - #of set index bits = 7
+            - #of block offset bits = 6
+            - #of tag bits = 19
+        - My L2 cache will be 8-way set associative to avoid conflict misses. That means each set is 2^9 bytes in size ⇒ there will be 1024 sets
+            - #of set index bits = 10
+            - #of block offset bits = 6
+            - #of tag bits = 16
+    - We have declared that the L2 cache is inclusive, so when an instruction hits in the L2 cache, we bring that cache line to the L1 cache but keep it in the L2 cache as well (need to update the MESI state)
+    - If a cache line is in the L1 cache it must also be in the L2 cache
+    - Review of MESI protocol:
+        - Modified: this specific cache line is dirty and this L1 cache has the most updated version
+        - Exclusive: this L1 cache is the only one that has this cache line in it
+        - Shared: multiple L1 caches have this cache line (none of them have updated it, this is still the most updated)
+        - Invalid: A different L1 cache has this cache line and has updated it, rendering this cache line obsolete
+        - Question: When a cache line is in the invalid state, are we essentially clearing that line in the cache?
+- Specifications on how the L2 cache will communicate with the DRAM
+    - There are two main scenarios why an L2 cache will need to communicate with DRAM: dirty eviction or an L2 cache miss
+    - there will be an MSHR allocated for both of these scenarios
+    - an MSHR will be a struct that contains key information about the line:
+        - The actual 64 byte data
+        - The memory address
+        - core_id
+        - state
+    - The MSHR objects will be stored in an array. We will use 2 pointers (allocate and issue) that will point to MSHRs in the array so that we can implement round-robin allocation and issues
+    - The AXI4 Interface has 5 channels
+        - Address Read: Master tells slave what address it is trying to read
+            - `ARADDR`: Address to read from
+            - `ARVALID`: Asserted by L2 cache when request is ready
+            - `ARREADY`: Asserted by DRAM when it's ready to accept
+            - `ARSIZE`, `ARBURST`, `ARLEN`: Control signals defining burst size, type, and length
+        - Read Data: Slave gives master the data it wants to read
+            - `RDATA`: Data returned from DRAM
+            - `RVALID`: Asserted by DRAM when data is valid
+            - `RREADY`: Asserted by L2 cache when it’s ready to accept
+            - `RLAST`: Marks the final beat in a burst
+            - `RRESP`: Response status (e.g., OKAY or SLVERR)
+        - Address Write: Master tells slave what address it is trying to write to
+            - `AWVALID`, `AWREADY`: Same handshake pattern
+            - `AWSIZE`, `AWBURST`, `AWLEN`: Similar to `AR` channel
+        - Write Data: Master gives slave the data it is trying to write
+            - `WDATA`: Data to write
+            - `WSTRB`: Byte-wise write enables
+            - `WVALID`, `WREADY`: Handshake
+            - `WLAST`: Final beat of burst
+        - Write Response: Slave tells master if it successfully received the new data
+            - `BRESP`: Status of write
+            - `BVALID`, `BREADY`: Standard handshake
