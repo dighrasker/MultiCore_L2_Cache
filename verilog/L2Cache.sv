@@ -45,15 +45,3 @@ module L2Cache #() (
     output logic b_valid,
     input logic b_ready
 ); 
-
-
-/*TODO 
-
-1. Ask copilot what beat is?
-2. Determine what signals I need for MESI protocol from L2Cache side
-3. Finish the interface for L2Cache.sv
-
-
-
-
-*/
