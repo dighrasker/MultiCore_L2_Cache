@@ -12,6 +12,8 @@ module L2Cache #() (
 	output logic [511:0] refill_data,  //Cache line that L2 wants to send to L1
 	output logic [31:0] refill_addr, //address associated with the cache line going to L1
 	input logic refill_ready, //L1 is ready to accept the refill line
+    output logic [3:0] l1_mask,
+	output logic [1:0] mesi_state,
 	
 //-------------To/From DRAM----------------//
 	
@@ -45,3 +47,28 @@ module L2Cache #() (
     output logic b_valid,
     input logic b_ready
 ); 
+
+memDP #(
+    .WIDTH     ($bits(MEM_BLOCK)),
+    .DEPTH     (),
+    .READ_PORTS(1),
+    .BYPASS_EN (0))
+L2_mem (
+    .clock(clock),
+    .reset(reset),
+    .re   (),
+    .raddr(),
+    .rdata(),
+    .we   (),
+    .waddr(),
+    .wdata()
+);
+
+
+//logic that deals with L1 communication
+
+//logic that tracks MESI protocol
+
+//logic that deals with DRAM communication
+
+endmodule
