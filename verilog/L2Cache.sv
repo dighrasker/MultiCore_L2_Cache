@@ -6,6 +6,8 @@ module L2Cache #() (
 //-------------To/From L1 Cache------------//
     input          L2_ENTRY_PACKET l2_entry_packet, 
     output          L2_EXIT_PACKET l2_exit_packet,
+    input        SNOOP_RESP_PACKET snoop_resp,
+    output        SNOOP_REQ_PACKET snoop_req,
 //-------------To/From DRAM (AXI4)----------------//
 //Address Read: Master tells slave what address it is trying to read
     input                     logic ar_ready, 
@@ -87,49 +89,132 @@ always_comb begin
         logic upgrade_confirm;
     */
 
-    l2_exit = '0;
-    l2_exit.req_type = l2_entry_packet.req_type;
+    l2_exit             = '0;
+    snoop_req           = 0;
+
+    next_write_meta     = write_meta;
+    next_write_data     = write_data;
+
+    l2_exit.req_type    = l2_entry_packet.req_type;
     l2_exit.target_addr = l2_entry_packet.target_addr;
-    l2_exit.core_id = l2_entry_packet.core_id;
+    l2_exit.core_id     = l2_entry_packet.core_id;    
 
     hit_any = |hit;
 
-    next_write_meta = write_meta;
-    
-    if(l2_entry_packet.req_type == READ || l2_entry_packet.req_type == WRITE) begin
-        if(hit_any) begin
+    case(l2_entry_packet.req_type)
 
-            //send back the requested cache line
-            for(int i = 0; i < `WAYS; ++i) begin
-                if(hit[i]) begin
-                    l2_exit.cache_line = read_data[i];
+        READ: begin
+            if(hit_any) begin
+                //which way is a tag match
+                int winner = 0;
+                for (int i = 0; i < `WAYS; i++) begin
+                    if (hit[i]) winner = i;
                 end
-            end
 
-            //update meta data in case of a read
-            if(l2_entry_packet.req_type == READ) begin
-                next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
-                next_write_meta.owner_state = 
-            end
+                //another core has this line in MODIFIED
+                if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
+                    snoop_req.valid = 1'b1;
+                    snoop_req.addr = l2_entry_packet.target_addr;
+                    snoop_req.req_type = SHARED;
+                    for (int c = 0; c < `NUM_CORES; c++) begin
+                        if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
+                            snoop_req.target_core = c;
+                    end
+                    if (snoop_resp.valid && (snoop_resp.addr == l2_entry_packet.target_addr)) begin //after we get back the response
+                        // Install dirty line into L2
+                        next_write_data   = snoop_resp.data;
 
-            //update meta data in case of a write
-            if(l2_entry_packet.req_type == WRITE) begin
-                for(int k = 0; k < `NUM_CORES; ++k) begin
-                    next_write_meta.sharers[k] = (k == l2_entry_packet.core_id);
+                        //update meta data
+                        next_write_meta   = read_meta[winner];
+                        next_write_meta.dirty       = 1'b0;
+                        next_write_meta.owner_state = SHARED;
+                        next_write_meta.sharers     = (1 << l2_entry_packet.core_id) || write_meta.sharers;
+
+                        //send updated cache line back to requester
+                        l2_exit.cache_line = snoop_resp.data;
+                    end
+                end 
+                
+                //no other core has this line in modified
+                else begin
+                    l2_exit.cache_line  = read_data[winner];
+                    next_write_meta     = read_meta[winner];
+                    next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
+                    next_write_meta.owner_state = (next_write_meta.sharers == (1 << l2_entry_packet.core_id)) ? EXCLUSIVE : SHARED; 
                 end
-                next_write_meta.dirty = 1'b1;
-                next_write_meta.owner_state = MODIFIED;
-            end
+            end else begin
+                //No tags matched, need to use MSHRS to acces DRAM
 
-        end else begin //MSHR and AXI4 read logic
-        
+
+            end
         end
-    end else if (l2_entry_packet.req_type == EVICT) begin
 
-    
-    end else begin
+        WRITE: begin
+            if(hit_any) begin
+                //which way is a tag match
+                int winner = 0;
+                for (int i = 0; i < `WAYS; i++) begin
+                    if (hit[i]) winner = i;
+                end
 
-    end
+                //another core has this line in MODIFIED
+                if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
+                    snoop_req.valid = 1'b1;
+                    snoop_req.addr = l2_entry_packet.target_addr;
+                    snoop_req.req_type = INVALID;
+                    for (int c = 0; c < `NUM_CORES; c++) begin
+                        if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
+                            snoop_req.target_core = c;
+                    end
+                    if (snoop_resp.valid && (snoop_resp.addr == l2_entry_packet.target_addr)) begin //after we get back the response
+                        // Install dirty line into L2
+                        next_write_data   = snoop_resp.data;
+
+                        //update meta data
+                        next_write_meta   = read_meta[winner];
+                        next_write_meta.dirty       = 1'b1;
+                        next_write_meta.owner_state = MODIFIED;
+                        next_write_meta.sharers     = (1 << l2_entry_packet.core_id);
+
+                        //send updated cache line back to requester
+                        l2_exit.cache_line = snoop_resp.data;
+                    end
+                end 
+                
+                //no other core has this line in modified
+                else begin
+                    l2_exit.cache_line  = read_data[winner];
+                    next_write_meta     = read_meta[winner];
+                    next_write_meta.dirty       = 1'b1;
+                    next_write_meta.owner_state = MODIFIED;
+                    next_write_meta.sharers = 1 << l2_entry_packet.core_id;
+                end
+            end else begin
+                //No tags matched, need to use MSHRS to acces DRAM
+                
+
+            end
+        end
+
+        UPGRADE: begin
+            snoop_req.valid = 1'b1;
+            snoop_req.addr = l2_entry_packet.target_addr;
+            snoop_req.req_type = INVALID;
+            if (snoop_resp.valid && (snoop_resp.addr == l2_entry_packet.target_addr)) begin
+                l2_exit.cache_line  = read_data[winner];
+                next_write_meta     = read_meta[winner];
+                next_write_meta.dirty       = 1'b1;
+                next_write_meta.owner_state = MODIFIED;
+                next_write_meta.sharers = 1 << l2_entry_packet.core_id;
+            end
+        end
+
+        default: begin
+
+        
+
+        end
+    endcase
 end
 
 always_ff @(posedge clock) begin
@@ -145,35 +230,4 @@ always_ff @(posedge clock) begin
 
 end
 
-
 endmodule
-
-
-
-/*
-  1. How are we structuring the meta data
-    -> each cache line needs bits to tell us what MESI state its in 
-    -> tag bits 
-
-
-
-  L2 receives an L2_ENTRY_PACKET from L1 as input
-
-    1. L1 is requesting to read data because that instruction missed in the L1 cache
-        -> Decompose the adress into tag/index/offset bits
-        -> use set index bits to retrieve tag, data in parallel
-        -> If there is a tag match
-            - we return the requested data line
-            - we update the meta data table to give exclusive access if no other core has it, shared access if other cores have it, and Modified access if req_type is a write
-        -> If there it is a L2 miss
-            - we need to allocate an MSHR so we can access DRAM for it
-            - one the cache line is back from DRAM, update memDP and send data line back to the L1 that requested it
-    2. L1 is evicting a dirty line and we need to update 
-
-
-    TODO:
-    1. Figure out MSHR stuff
-    2. 
-
-
-*/

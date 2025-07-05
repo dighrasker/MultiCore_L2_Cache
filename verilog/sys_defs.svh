@@ -106,6 +106,20 @@ typedef struct packed {
     logic [`L2_TAG_WIDTH-1:0]    tag;
 } META_PACKET;
 
+typedef struct packed {
+    logic                       valid,
+    ADDR                        addr,
+    logic [`NUM_CORE_BITS-1:0]  core_id,
+    REQ_TYPE_ENUM               req_type
+} SNOOP_REQ_PACKET;
+
+typedef struct packed {
+    logic                       valid,
+    ADDR                        addr,
+    CACHE_LINE                  data,
+    logic [`NUM_CORE_BITS-1:0]  core_id
+} SNOOP_RESP_PACKET;
+
 /*
 meta_packet.owner_state
 • 00 = Invalid / not present (only valid=0 uses this)
