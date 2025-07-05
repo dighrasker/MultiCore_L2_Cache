@@ -4,7 +4,7 @@
 `timescale 1ns/100ps
 
 `define NUM_CORES 4
-`define NUM_CORE_BITS $clog{NUM_CORES}
+`define NUM_CORE_BITS $clog2{NUM_CORES}
 
 
 //L2 Cache size parameters
@@ -12,9 +12,9 @@
 `define WAYS 8
 `define LINE_SIZE_BYTES 64
 `define SET_SIZE_BYTES `WAYS * `LINE_SIZE_BYTES
-`define NUM_SETS `CACHE_SIZE_BYTES * `SET_SIZE_BYTES
+`define NUM_SETS `CACHE_SIZE_BYTES / `SET_SIZE_BYTES
 `define LINE_SIZE_BITS (`LINE_SIZE_BYTES * 8)
-`define L2_TAG_WIDTH 32 - $clog{`NUM_SETS} - $clog{`LINE_SIZE_BITS}\
+`define L2_TAG_WIDTH 32 - $clog2{`NUM_SETS} - $clog2{`LINE_SIZE_BITS}\
 `define META_WIDTH 1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH
 
 typedef logic [511:0] CACHE_LINE; 
@@ -40,6 +40,13 @@ typedef enum logic [2:0] {
     WRITE    = 3'b010,
     EVICT    = 3'b011
 } REQ_TYPE_ENUM;
+
+typedef enum logic [1:0] {
+    INAVLID  = 2'b00,
+    SHARED     = 2'b01,
+    EXCLUSIVE    = 2'b10,
+    MODIFIED    = 2'b11
+} OWNER_STATE_ENUM;
 
 typedef struct packed {
     REQ_TYPE_ENUM req_type;
@@ -92,11 +99,11 @@ typedef struct packed {
 } WRITE_RESPONSE_PACKET;
 
 typedef struct packed {
-    logic                  valid;
-    logic                  dirty;
-    logic [N_CORES-1:0]    sharers;
-    logic [1:0]            owner_state;
-    logic [TAG_W-1:0]      tag;
+    logic                        valid;
+    logic                        dirty;
+    logic [`NUM_CORES-1:0]       sharers;
+    OWNER_STATE_ENUM             owner_state;
+    logic [`L2_TAG_WIDTH-1:0]    tag;
 } META_PACKET;
 
 /*

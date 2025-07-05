@@ -9,7 +9,7 @@ module L2Cache #() (
 //-------------To/From DRAM (AXI4)----------------//
 //Address Read: Master tells slave what address it is trying to read
     input                     logic ar_ready, 
-    output             ADDRESS_READ ar_packet,
+    output      ADDRESS_READ_PACKET ar_packet,
 // Read Data: Slave gives master the data it wants to read
     input          READ_DATA_PACKET r_packet,
     output                    logic r_ready,
@@ -25,22 +25,21 @@ module L2Cache #() (
 ); 
 
 
-//instantiating all the memDPs
+// Eviction policy (LRU bits) --NOOTTTT DONEEEE
 
-/*
--> Things we need to keep track of in the L2 cache
-    1. the actual data itself  ---DONE
-    2. Tags for each cache line for tag comparisons  --DONE
-    3. MESI state for each core --DONE
-    4. Eviction policy (LRU bits) --NOOTTTT DONEEEE
-    5. Dirty + valid bits   --DONE
-*/
-
+//parameters for memDP
 logic read_en, write_en;
-CACHE_LINE read_data;
-META_PACKET read_meta;
+CACHE_LINE  [`WAYS-1: 0] read_data;
+CACHE_LINE  [`WAYS-1: 0] write_data, next_write_data;
+META_PACKET [`WAYS-1: 0] read_meta;
+META_PACKET [`WAYS-1: 0] write_meta, next_write_meta;
 
-assign read_en = l2_entry_packet.req_type == READ || WRITE;
+
+L2_EXIT_PACKET l2_exit;
+logic [`WAYS-1:0] hit;
+logic hit_any;
+
+assign read_en = (l2_entry_packet.req_type == READ)|| (l2_entry_packet.req_type == WRITE);
 assign write_en = l2_entry_packet.req_type == EVICT;
 
 for(genvar w = 0; w < `WAYS; ++w) begin : ways
@@ -55,10 +54,10 @@ for(genvar w = 0; w < `WAYS; ++w) begin : ways
         .reset(reset),
         .re   (read_en),
         .raddr(l2_entry_packet.target_addr.l2_addr.set_idx),
-        .rdata(read_data),
+        .rdata(read_data[w]),
         .we   (write_en),
         .waddr(l2_entry_packet.target_addr.l2_addr.set_idx),
-        .wdata(l2_entry_packet.cache_line)
+        .wdata(write_data)
     );
 
     //corresponding tag array
@@ -72,13 +71,84 @@ for(genvar w = 0; w < `WAYS; ++w) begin : ways
         .reset(reset),
         .re   (read_en),
         .raddr(l2_entry_packet.target_addr.l2_addr.set_idx),
-        .rdata(read_meta),
+        .rdata(read_meta[w]),
         .we   (write_en),
         .waddr(l2_entry_packet.target_addr.l2_addr.set_idx),
-        .wdata()
+        .wdata(write_meta)
     );
 
+    hit[w] = read_meta[w].valid && (read_meta[w].tag == l2_entry_packet.target_addr.l2_addr.tag);
+
 end
+
+always_comb begin
+    /*
+        logic evict_confirm;
+        logic upgrade_confirm;
+    */
+
+    l2_exit = '0;
+    l2_exit.req_type = l2_entry_packet.req_type;
+    l2_exit.target_addr = l2_entry_packet.target_addr;
+    l2_exit.core_id = l2_entry_packet.core_id;
+
+    hit_any = |hit;
+
+    next_write_meta = write_meta;
+    
+    if(l2_entry_packet.req_type == READ || l2_entry_packet.req_type == WRITE) begin
+        if(hit_any) begin
+
+            //send back the requested cache line
+            for(int i = 0; i < `WAYS; ++i) begin
+                if(hit[i]) begin
+                    l2_exit.cache_line = read_data[i];
+                end
+            end
+
+            //update meta data in case of a read
+            if(l2_entry_packet.req_type == READ) begin
+                next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
+                next_write_meta.owner_state = 
+            end
+
+            //update meta data in case of a write
+            if(l2_entry_packet.req_type == WRITE) begin
+                for(int k = 0; k < `NUM_CORES; ++k) begin
+                    next_write_meta.sharers[k] = (k == l2_entry_packet.core_id);
+                end
+                next_write_meta.dirty = 1'b1;
+                next_write_meta.owner_state = MODIFIED;
+            end
+
+        end else begin //MSHR and AXI4 read logic
+        
+        end
+    end else if (l2_entry_packet.req_type == EVICT) begin
+
+    
+    end else begin
+
+    end
+end
+
+always_ff @(posedge clock) begin
+    if (reset) begin
+        l2_exit_packet <= 0;
+        write_meta <= 0;
+        write_data <= 0;
+    end else begin
+        l2_exit_packet <= l2_exit;
+        write_meta <= next_write_meta;
+        write_data <= next_write_data;
+    end
+
+end
+
+
+endmodule
+
+
 
 /*
   1. How are we structuring the meta data
@@ -101,18 +171,9 @@ end
     2. L1 is evicting a dirty line and we need to update 
 
 
+    TODO:
+    1. Figure out MSHR stuff
+    2. 
+
+
 */
-
-
-always_comb begin
-
-
-end
-
-always_ff @(posedge clock) begin
-
-end
-	
-
-
-endmodule
