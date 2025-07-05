@@ -5,6 +5,18 @@
 
 `define NUM_CORES 4
 `define NUM_CORE_BITS $clog{NUM_CORES}
+
+
+//L2 Cache size parameters
+`define CACHE_SIZE_BYTES 512000
+`define WAYS 8
+`define LINE_SIZE_BYTES 64
+`define SET_SIZE_BYTES `WAYS * `LINE_SIZE_BYTES
+`define NUM_SETS `CACHE_SIZE_BYTES * `SET_SIZE_BYTES
+`define LINE_SIZE_BITS (`LINE_SIZE_BYTES * 8)
+`define L2_TAG_WIDTH 32 - $clog{`NUM_SETS} - $clog{`LINE_SIZE_BITS}\
+`define META_WIDTH 1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH
+
 typedef logic [511:0] CACHE_LINE; 
 
 typedef union packed {
@@ -22,8 +34,15 @@ typedef union packed {
     } l2_addr;
 } ADDR;
 
+typedef enum logic [2:0] {
+    UPGRADE  = 3'b000,
+    READ     = 3'b001,
+    WRITE    = 3'b010,
+    EVICT    = 3'b011
+} REQ_TYPE_ENUM;
+
 typedef struct packed {
-    logic [2:0] req_type;
+    REQ_TYPE_ENUM req_type;
     CACHE_LINE cache_line;
     ADDR target_addr;
     logic [`NUM_CORE_BITS-1:0] core_id;
@@ -37,7 +56,6 @@ typedef struct packed {
     logic evict_confirm;
     logic upgrade_confirm;
 } L2_EXIT_PACKET;
-
 
 typedef struct packed {
     ADDR ar_addr, // Address to read from
@@ -73,28 +91,18 @@ typedef struct packed {
     logic b_ready
 } WRITE_RESPONSE_PACKET;
 
+typedef struct packed {
+    logic                  valid;
+    logic                  dirty;
+    logic [N_CORES-1:0]    sharers;
+    logic [1:0]            owner_state;
+    logic [TAG_W-1:0]      tag;
+} META_PACKET;
 
 /*
-- Address Read: Master tells slave what address it is trying to read
-    - `ARADDR`: Address to read from
-    - `ARVALID`: Asserted by L2 cache when request is ready
-    - `ARREADY`: Asserted by DRAM when it's ready to accept
-    - `ARSIZE`, `ARBURST`, `ARLEN`: Control signals defining burst size, type, and length
-- Read Data: Slave gives master the data it wants to read
-    - `RDATA`: Data returned from DRAM
-    - `RVALID`: Asserted by DRAM when data is valid
-    - `RREADY`: Asserted by L2 cache when it’s ready to accept
-    - `RLAST`: Marks the final beat in a burst
-    - `RRESP`: Response status (e.g., OKAY or SLVERR)
-- Address Write: Master tells slave what address it is trying to write to
-    - `AWVALID`, `AWREADY`: Same handshake pattern
-    - `AWSIZE`, `AWBURST`, `AWLEN`: Similar to `AR` channel
-- Write Data: Master gives slave the data it is trying to write
-    - `WDATA`: Data to write
-    - `WSTRB`: Byte-wise write enables
-    - `WVALID`, `WREADY`: Handshake
-    - `WLAST`: Final beat of burst
-- Write Response: Slave tells master if it successfully received the new data
-    - `BRESP`: Status of write
-    - `BVALID`, `BREADY`: Standard handshake
+meta_packet.owner_state
+• 00 = Invalid / not present (only valid=0 uses this)
+• 01 = Shared (no core has write permission; can be many sharers)
+• 10 = Exclusive (exactly one sharer, clean)
+• 11 = Modified (exactly one sharer, dirty).
 */

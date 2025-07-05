@@ -58,7 +58,7 @@ generate
                     if (we && (raddr[i] == waddr))
                         rdata[i] = wdata;
                     else
-                        rdata[i] = memData[raddr[i]];
+                        rdata[i] = memData[raddr[i]]; //the line that actually returns the data at the address we want
                 end else begin
                     rdata[i] = '0;
                 end
@@ -77,7 +77,7 @@ always_ff @(posedge clock) begin
     if (reset) begin
         memData        <= '0;
     end else if (we) begin
-        memData[waddr] <= wdata;
+        memData[waddr] <= wdata; //the line that actually writes the data into the table
     end
     // for(int i = 0; i < DEPTH; ++i) begin
     //     $display("MemDP[%d]: %d", i, memData[i]);
