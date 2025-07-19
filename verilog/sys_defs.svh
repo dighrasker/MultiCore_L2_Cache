@@ -13,9 +13,15 @@
 `define LINE_SIZE_BYTES 64
 `define SET_SIZE_BYTES `WAYS * `LINE_SIZE_BYTES
 `define NUM_SETS `CACHE_SIZE_BYTES / `SET_SIZE_BYTES
+`define NUM_SETS_BITS $clog2{`NUM_SETS}
 `define LINE_SIZE_BITS (`LINE_SIZE_BYTES * 8)
 `define L2_TAG_WIDTH 32 - $clog2{`NUM_SETS} - $clog2{`LINE_SIZE_BITS}\
 `define META_WIDTH 1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH
+`define NUM_MSHRS 8
+`define WAY_IDX_BITS $clog2(`WAYS)
+
+typedef logic [`WAY_IDX_BITS-1:0] LRU;
+typedef logic [`NUM_SETS_BITS-1:0] SET_IDX;
 
 typedef logic [511:0] CACHE_LINE; 
 
@@ -59,38 +65,34 @@ typedef struct packed {
     logic [2:0] req_type;
     CACHE_LINE cache_line;
     ADDR target_addr;
-    logic [`NUM_CORE_BITS-1:0] core_id;
+    //logic [`NUM_CORE_BITS-1:0] core_id;
     logic evict_confirm;
     logic upgrade_confirm;
+    logic stall;
 } L2_EXIT_PACKET;
 
 typedef struct packed {
     ADDR ar_addr, // Address to read from
     logic ar_valid,//asserted by L2 cache when request is ready
-    logic [1:0] ar_len,
-    logic [1:0] ar_size,
-    logic [1:0] ar_burst,
+    logic [2:0] ar_prot
 } ADDRESS_READ_PACKET;
 
 typedef struct packed {
     CACHE_LINE r_data, // Data returned from DRAM
     logic r_valid, // Asserted by DRAM when data is valid
-    logic r_last,
     logic r_resp,
 } READ_DATA_PACKET;
 
 typedef struct packed {
+    ADDR aw_addr, // Address to read from
     logic aw_valid,//asserted by L2 cache when request is ready
-    logic [1:0] aw_len,
-    logic [1:0] aw_size,
-    logic [1:0] aw_burst,
+    logic [2:0] aw_prot
 } ADDRESS_WRITE_PACKET;
 
 typedef struct packed {
     CACHE_LINE w_data, // Data to write
     logic w_valid,//asserted by L2 cache when request is ready
     logic [63:0] w_strb, //will always be all 1s as I am not planning on doing partial writes
-    logic w_last,
 } WRITE_DATA_PACKET;
 
 typedef struct packed {
@@ -119,6 +121,14 @@ typedef struct packed {
     CACHE_LINE                  data,
     logic [`NUM_CORE_BITS-1:0]  core_id
 } SNOOP_RESP_PACKET;
+
+typedef struct packed {
+    logic                       valid,
+    ADDR                        addr,
+    CACHE_LINE                  data,
+    logic [`NUM_CORE_BITS-1:0]  core_id
+    logic [1:0]                 req_type;
+} MSHR;
 
 /*
 meta_packet.owner_state
