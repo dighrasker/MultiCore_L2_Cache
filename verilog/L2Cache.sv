@@ -44,6 +44,9 @@ logic [2:0] free_idx, next_free_idx;
 assign read_en = (l2_entry_packet.req_type == READ)|| (l2_entry_packet.req_type == WRITE);
 assign write_en = l2_entry_packet.req_type == EVICT;
 
+
+
+
 for(genvar w = 0; w < `WAYS; ++w) begin : ways
     //creates 8 data arrays for each way
     memDP #(

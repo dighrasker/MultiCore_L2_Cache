@@ -49,6 +49,7 @@ CACHE_LINE  [`WAYS-1: 0] write_data, next_write_data; //stores the value we are 
 
 //------- META memDP---------//
 //read signals
+logic [`WAYS-1:0] read_meta_en;
 SET_IDX [`WAYS-1:0] read_meta_addr;
 META_PACKET [`WAYS-1: 0] read_meta;
 
@@ -65,7 +66,7 @@ LRU [`NUM_SETS-1:0][`WAY-1:0] lrus, next_lrus;
 //MSHR signals + storage
 MSHR   [`NUM_MSHRS-1: 0] mshrs, next_mshrs;
 logic [2:0] free_idx, next_free_idx;
-logic [2:0] wait_idx, next_wait_idx;
+logic [2:0] wait_idx;
 logic mshr_exists;
 
 //AXI4 signals
@@ -74,8 +75,9 @@ WRITE_DATA_PACKET next_w_packet;
 ADDRESS_READ_PACKET next_ar_packet;
 
 
-assign read_en = (l2_entry_packet.req_type == READ)|| (l2_entry_packet.req_type == WRITE) || r_valid;
-assign write_en = l2_entry_packet.req_type == EVICT;
+//-------------------------
+//Cache Data and Meta Data
+//-------------------------
 
 for(genvar w = 0; w < `WAYS; ++w) begin : ways
     //creates 8 data arrays for each way
@@ -104,7 +106,7 @@ for(genvar w = 0; w < `WAYS; ++w) begin : ways
     L2_tags (
         .clock(clock),
         .reset(reset),
-        .re   (read_en[w]),
+        .re   (read_meta_en[w]),
         .raddr(read_meta_addr[w]),
         .rdata(read_meta[w]),
         .we   (write_meta_en[w]),
@@ -116,11 +118,19 @@ for(genvar w = 0; w < `WAYS; ++w) begin : ways
 
 end
 
+//--------------------
+//Combinational Logic
+//--------------------
+
 always_comb begin
 
-    //default values to avoid latching
+    //--------------------
+    //Default values (avoid latching)
+    //--------------------
     read_en = 0;
+    read_meta_en = 0;
     write_en = 0;
+    write_meta_en = 0;
     next_l2_exit_packet = l2_exit_packet;
     next_snoop_req = snoop_req;
     next_mshrs = mshrs;
@@ -130,9 +140,13 @@ always_comb begin
     next_w_packet = w_packet;
     write_meta_en = 0'b0;
     next_lrus = lrus;
-    next_wait_idx = wait_idx;
 
     hit_any = |hit;
+
+
+    //------------------------
+    //Signals from DRAM
+    //------------------------
     
     if(r_valid) begin //we are recieving data from DRAM in this cycle
         //READ DATA LOGIC
@@ -140,9 +154,41 @@ always_comb begin
         for(int i = 0; i < `WAYS; ++i) begin
             if(lrus[mshr[wait_idx].addr.l2_addr.set_idx][i] == 0) winner = i;
         end
+
+        //update lru
+        for(int i = 0; i < `WAYS; ++i) begin
+            if(i == winner) begin
+                next_lrus[mshr[wait_idx].addr.l2_addr.set_idx][i] = `WAYS - 1;
+            end else begin
+                next_lrus[mshr[wait_idx].addr.l2_addr.set_idx][i] -= 1;
+            end
+        end
+
+        //increment wait_idx
+        wait_idx = (wait_idx + 1) % `NUM_MSHRS;
+
+
         write_en[winner] = 1'b1;
+        read_meta_en[winner] = 1'b1;
         write_addr[winner] = mshr[wait_idx].addr.l2_addr.set_idx;
         write_data[winner] = r_data;
+
+        if(read_meta[winner].valid && read_meta[winner].owner_state == MODIFIED) begin
+        
+
+
+        end else if (read_meta[winner].valid && read_meta[winner].dirty) begin //L2 is dirty but it has the most update copy
+            
+
+            
+
+        
+        end else begin 
+            //line we are evicting is not dirty, but other L1's might have it in shared
+
+            //line we are evicitng is not dirty, and other L1's do not have it
+
+        end
         //if I just got new data from dram BUT I am writing it to smtg that has a valid cache line in it
             //WRITE ADDRESS + WRITE DATA channels
 
@@ -159,14 +205,15 @@ always_comb begin
 
 
             }
-            The rule => all numbers higher than the hit lru decrement by 1 and the hit lru = num_ways
-                  h
-            0  1  2  3
-            0  1  3  2
+
 
 
         */
     end
+
+    //--------------------
+    //L1 Cache Communication
+    //--------------------
     
     if(!l2_exit_packet[l2_entry_packet.core_id].stall) begin  //lets check what l2_entry_packet has ONLY IF we are not stall
 
@@ -181,6 +228,7 @@ always_comb begin
                         end 
                     end
                     read_en[winner] = 1'b1;
+                    read_meta_en[winner] = 1'b1;
                     read_addr[winner] = l2_entry_packet.addr.l2_addr.set_idx;
                     read_meta_addr[winner] = l2_entry_packet.addr.l2_addr.set_idx;
                     //another core has this line in MODIFIED
@@ -209,9 +257,9 @@ always_comb begin
                         end
                     end else begin //no other core has this line in modified
                         l2_exit.cache_line  = read_data[winner];
-                        next_write_meta     = read_meta[winner];
-                        next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
-                        next_write_meta.owner_state = (next_write_meta.sharers == (1 << l2_entry_packet.core_id)) ? EXCLUSIVE : SHARED; 
+                        next_write_meta[winner]     = read_meta[winner];
+                        next_write_meta[winner].sharers[l2_entry_packet.core_id] = 1'b1;
+                        next_write_meta[winner].owner_state = (next_write_meta[winner].sharers == (1 << l2_entry_packet.core_id)) ? EXCLUSIVE : SHARED; 
                     end
                 
                 end else begin //L2 miss => need to request DRAM for this cache line
@@ -254,6 +302,7 @@ always_comb begin
                         if (hit[i]) winner = i;
                     end
                     read_en[winner] = 1'b1;
+                    read_meta_en[winner] = 1'b1;
                     read_addr[winner] = l2_entry_packet.addr.l2_addr.set_idx;
                     read_meta_addr[winner] = l2_entry_packet.addr.l2_addr.set_idx;
 
@@ -273,20 +322,20 @@ always_comb begin
                             next_write_data   = snoop_resp.data;
 
                             //update meta data
-                            next_write_meta   = read_meta[winner];
-                            next_write_meta.dirty       = 1'b0;
-                            next_write_meta.owner_state = MODIFIED;
-                            next_write_meta.sharers     = (1 << l2_entry_packet.core_id) || write_meta.sharers;
+                            next_write_meta[winner]   = read_meta[winner];
+                            next_write_meta[winner].dirty       = 1'b0;
+                            next_write_meta[winner].owner_state = MODIFIED;
+                            next_write_meta[winner].sharers     = (1 << l2_entry_packet.core_id) || write_meta.sharers;
 
                             //send updated cache line back to requester
                             l2_exit[l2_entry_packet.core_id].cache_line = snoop_resp.data;
                         end
                     end else begin //no other core has this line in modified
-                        write_meta_en = 1'b1;
+                        write_meta_en[winner] = 1'b1;
                         l2_exit[l2_entry_packet.core_id].cache_line  = read_data[winner];
-                        next_write_meta     = read_meta[winner];
-                        next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
-                        next_write_meta.owner_state = (next_write_meta.sharers == (1 << l2_entry_packet.core_id)) ? MODIFIED : INVALID; 
+                        next_write_meta[winner]     = read_meta[winner];
+                        next_write_meta[winner].sharers[l2_entry_packet.core_id] = 1'b1;
+                        next_write_meta[winner].owner_state = (next_write_meta.sharers == (1 << l2_entry_packet.core_id)) ? MODIFIED : INVALID; 
                     end
                 
                 end else begin
@@ -328,11 +377,11 @@ always_comb begin
                 end
 
                 //no other core has this line in modified
-                write_meta_en = 1'b1;
+                write_meta_en[winner] = 1'b1;
                 l2_exit[l2_entry_packet.core_id].cache_line  = read_data[winner];
-                next_write_meta     = read_meta[winner];
-                next_write_meta.sharers[l2_entry_packet.core_id] = 1'b1;
-                next_write_meta.owner_state = (next_write_meta.sharers == (1 << l2_entry_packet.core_id)) ? MODIFIED : INVALID;
+                next_write_meta[winner]     = read_meta[winner];
+                next_write_meta[winner].sharers[l2_entry_packet.core_id] = 1'b1;
+                next_write_meta[winner].owner_state = (next_write_meta[winner].sharers == (1 << l2_entry_packet.core_id)) ? MODIFIED : INVALID;
 
             EVICTION: //can't be an L2 miss on an eviction, just need to update MESI status and meta data
                 int winner = 0;
@@ -340,17 +389,36 @@ always_comb begin
                     if (hit[i]) winner = i;
                 end
 
-                next_write_data = l2_entry_packet.cache_line;
-                write_meta_en = 1'b1;
-                next_write_meta = read_meta[winner];
-                next_write_meta.sharers = 0;
-                next_write_meta.owner_state = INVALID;
+                next_write_data[winner] = l2_entry_packet.cache_line;
+                write_meta_en[winner] = 1'b1;
+                next_write_meta[winner] = read_meta[winner];
+                next_write_meta[winner].sharers = 0;
+                next_write_meta[winner].dirty = 1'b1;
+                next_write_meta[winner].owner_state = INVALID;
             default:
 
 
         endcase
     
     end
+
+
+    //------------------------
+    //Signals to DRAM (MSHR)
+    //------------------------
+    if(mshrs[wait_idx].valid) begin
+        if(mshrs[wait_idx].req_type == READ || mshrs[wait_idx].req_type == WRITE) begin //use the Read Address channel
+            
+            
+
+        end else if (mshrs[wait_idx].req_type == EVICTION) begin // use the Write Address and Data Write channel
+            
+
+        end
+    
+    end
+
+
 
 end
 
