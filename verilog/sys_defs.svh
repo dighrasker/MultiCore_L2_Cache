@@ -97,7 +97,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic b_resp,
-    logic b_ready
+    logic b_valid
 } WRITE_RESPONSE_PACKET;
 
 typedef struct packed {
@@ -105,7 +105,7 @@ typedef struct packed {
     logic                        dirty;
     logic [`NUM_CORES-1:0]       sharers;
     OWNER_STATE_ENUM             owner_state;
-    logic [`L2_TAG_WIDTH-1:0]    tag;
+    ADDR                         addr;
 } META_PACKET;
 
 typedef struct packed {
@@ -126,8 +126,8 @@ typedef struct packed {
     logic                       valid,
     ADDR                        addr,
     CACHE_LINE                  data,
-    logic [`NUM_CORE_BITS-1:0]  core_id
-    logic [1:0]                 req_type;
+    logic [`NUM_CORE_BITS-1:0]  core_id,
+    logic                       write_req
 } MSHR;
 
 /*

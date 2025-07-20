@@ -4,8 +4,8 @@ module L2Cache #() (
 //-------------To/From L1 Cache------------//
     input          L2_ENTRY_PACKET l2_entry_packet, //seq
     output          L2_EXIT_PACKET [`NUM_CORES-1: 0] l2_exit_packet, //seq
-    input        SNOOP_RESP_PACKET snoop_resp, //seq
-    output        SNOOP_REQ_PACKET snoop_req, //seq
+    input        SNOOP_RESP_PACKET [`NUM_CORES-1: 0] snoop_resp, //seq
+    output        SNOOP_REQ_PACKET [`NUM_CORES-1: 0] snoop_req, //seq
 //-------------To/From DRAM (AXI4)----------------//
 //Address Read: Master tells slave what address it is trying to read
     input                     logic ar_ready, //comb
@@ -21,7 +21,7 @@ module L2Cache #() (
     output        WRITE_DATA_PACKET w_packet, //seq
 //Write Response: Slave tells master if it successfully received the new data
     input     WRITE_RESPONSE_PACKET b_packet,
-    output                    logic b_valid
+    output                    logic b_ready
 ); 
 
 
@@ -114,7 +114,7 @@ for(genvar w = 0; w < `WAYS; ++w) begin : ways
         .wdata(write_meta[w])
     );
 
-    assign hit[w] = read_meta[w].valid && (read_meta[w].tag == l2_entry_packet.target_addr.l2_addr.tag);
+    assign hit[w] = read_meta[w].valid && (read_meta[w].addr.l2_addr.tag == l2_entry_packet.target_addr.l2_addr.tag);
 
 end
 
@@ -173,7 +173,7 @@ always_comb begin
         write_addr[winner] = mshr[wait_idx].addr.l2_addr.set_idx;
         write_data[winner] = r_data;
 
-        if(read_meta[winner].valid && read_meta[winner].owner_state == MODIFIED) begin
+        if(read_meta[winner].valid && read_meta[winner].owner_state == MODIFIED) begin //some L1 has a dirty version of the cache line beign evicted
         
 
 
@@ -234,17 +234,18 @@ always_comb begin
                     //another core has this line in MODIFIED
                     if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
                         waiting = 1'b1;
-                        snoop_req.valid = 1'b1;
-                        snoop_req.addr = l2_entry_packet.target_addr;
-                        snoop_req.req_type = SHARED;
+                        int target_core = -1;
                         for (int c = 0; c < `NUM_CORES; c++) begin
                             if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
-                                snoop_req.core_id = c;
+                                target_core = c;
                         end
-                        if (snoop_resp.valid && (snoop_resp.addr == l2_entry_packet.target_addr)) begin //after we get back the response
+                        snoop_req[target_core].valid = 1'b1;
+                        snoop_req[target_core].addr = l2_entry_packet.target_addr;
+                        snoop_req[target_core].req_type = SHARED;
+                        if (snoop_resp[target_core].valid && (snoop_resp[target_core].addr == l2_entry_packet.target_addr)) begin //after we get back the response
                             waiting = 1'b0;
                             // Install dirty line into L2
-                            next_write_data   = snoop_resp.data;
+                            next_write_data   = snoop_resp[target_core].data;
 
                             //update meta data
                             next_write_meta   = read_meta[winner];
@@ -253,7 +254,7 @@ always_comb begin
                             next_write_meta.sharers     = (1 << l2_entry_packet.core_id) || write_meta.sharers;
 
                             //send updated cache line back to requester
-                            l2_exit.cache_line = snoop_resp.data;
+                            l2_exit.cache_line = snoop_resp[target_core].data;
                         end
                     end else begin //no other core has this line in modified
                         l2_exit.cache_line  = read_data[winner];
@@ -309,17 +310,18 @@ always_comb begin
                     //another core has this line in MODIFIED
                     if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
                         waiting = 1'b1;
-                        snoop_req.valid = 1'b1;
-                        snoop_req.addr = l2_entry_packet.target_addr;
-                        snoop_req.req_type = INVALID;
+                        int target_core = -1;
                         for (int c = 0; c < `NUM_CORES; c++) begin
                             if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
-                                snoop_req.core_id = c;
+                                target_core = c;
                         end
-                        if (snoop_resp.valid && (snoop_resp.addr == l2_entry_packet.target_addr)) begin //after we get back the response
+                        snoop_req[target_core].valid = 1'b1;
+                        snoop_req[target_core].addr = l2_entry_packet.target_addr;
+                        snoop_req[target_core].req_type = INVALID;
+                        if (snoop_resp[target_core].valid && (snoop_resp[target_core].addr == l2_entry_packet.target_addr)) begin //after we get back the response
                             waiting = 1'b0;
                             // Install dirty line into L2
-                            next_write_data   = snoop_resp.data;
+                            next_write_data   = snoop_resp[target_core].data;
 
                             //update meta data
                             next_write_meta[winner]   = read_meta[winner];
@@ -328,7 +330,7 @@ always_comb begin
                             next_write_meta[winner].sharers     = (1 << l2_entry_packet.core_id) || write_meta.sharers;
 
                             //send updated cache line back to requester
-                            l2_exit[l2_entry_packet.core_id].cache_line = snoop_resp.data;
+                            l2_exit[l2_entry_packet.core_id].cache_line = snoop_resp[target_core].data;
                         end
                     end else begin //no other core has this line in modified
                         write_meta_en[winner] = 1'b1;
@@ -389,6 +391,7 @@ always_comb begin
                     if (hit[i]) winner = i;
                 end
 
+                write_addr = 
                 next_write_data[winner] = l2_entry_packet.cache_line;
                 write_meta_en[winner] = 1'b1;
                 next_write_meta[winner] = read_meta[winner];
@@ -406,16 +409,18 @@ always_comb begin
     //------------------------
     //Signals to DRAM (MSHR)
     //------------------------
-    if(mshrs[wait_idx].valid) begin
-        if(mshrs[wait_idx].req_type == READ || mshrs[wait_idx].req_type == WRITE) begin //use the Read Address channel
-            
-            
-
-        end else if (mshrs[wait_idx].req_type == EVICTION) begin // use the Write Address and Data Write channel
-            
-
+    if(mshrs[wait_idx].valid && (mshrs[wait_idx].req_type == READ || mshrs[wait_idx].req_type == WRITE)) begin //use the Read Address channel
+        if(ar_ready) begin
+            ar_valid = 1'b1;
+            ar_addr = mshrs[wait_idx].addr;
+            ar_prot = 3'b000;
+        end      
+    end else if (mshrs[wait_idx].valid && mshrs[wait_idx].req_type == EVICTION) begin // use the Write Address and Data Write channel
+        if(aw_valid) begin
+            aw_valid = 1'b1;
+            aw_addr = mshrs[wait_idx].addr;
+            aw_prot = 3'b000;
         end
-    
     end
 
 
