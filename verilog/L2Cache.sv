@@ -1,3 +1,5 @@
+`include "verilog/sys_defs.svh"
+
 module L2Cache #() (
 	input                    logic clock,
 	input                    logic reset,
@@ -61,7 +63,7 @@ META_PACKET [`WAYS-1: 0] write_meta, next_write_meta;
 
 logic [`WAYS-1:0] hit;
 logic hit_any;
-LRU [`NUM_SETS-1:0][`WAY-1:0] lrus, next_lrus;
+LRU [`NUM_SETS-1:0][`WAYS-1:0] lrus, next_lrus;
 
 //MSHR signals + storage
 MSHR   [`NUM_MSHRS-1: 0] mshrs, next_mshrs;

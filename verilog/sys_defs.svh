@@ -4,7 +4,7 @@
 `timescale 1ns/100ps
 
 `define NUM_CORES 4
-`define NUM_CORE_BITS $clog2{NUM_CORES}
+`define NUM_CORE_BITS $clog2(NUM_CORES)
 
 
 //L2 Cache size parameters
@@ -13,9 +13,9 @@
 `define LINE_SIZE_BYTES 64
 `define SET_SIZE_BYTES `WAYS * `LINE_SIZE_BYTES
 `define NUM_SETS `CACHE_SIZE_BYTES / `SET_SIZE_BYTES
-`define NUM_SETS_BITS $clog2{`NUM_SETS}
+`define NUM_SETS_BITS $clog2(`NUM_SETS)
 `define LINE_SIZE_BITS (`LINE_SIZE_BYTES * 8)
-`define L2_TAG_WIDTH 32 - $clog2{`NUM_SETS} - $clog2{`LINE_SIZE_BITS}\
+`define L2_TAG_WIDTH 32 - $clog2(`NUM_SETS) - $clog2(`LINE_SIZE_BITS)
 `define META_WIDTH 1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH
 `define NUM_MSHRS 8
 `define WAY_IDX_BITS $clog2(`WAYS)
@@ -72,32 +72,32 @@ typedef struct packed {
 } L2_EXIT_PACKET;
 
 typedef struct packed {
-    ADDR ar_addr, // Address to read from
-    logic ar_valid,//asserted by L2 cache when request is ready
-    logic [2:0] ar_prot
+    ADDR ar_addr; // Address to read from
+    logic ar_valid;//asserted by L2 cache when request is ready
+    logic [2:0] ar_prot;
 } ADDRESS_READ_PACKET;
 
 typedef struct packed {
-    CACHE_LINE r_data, // Data returned from DRAM
-    logic r_valid, // Asserted by DRAM when data is valid
-    logic r_resp,
+    CACHE_LINE r_data; // Data returned from DRAM
+    logic r_valid; // Asserted by DRAM when data is valid
+    logic r_resp;
 } READ_DATA_PACKET;
 
 typedef struct packed {
-    ADDR aw_addr, // Address to read from
-    logic aw_valid,//asserted by L2 cache when request is ready
-    logic [2:0] aw_prot
+    ADDR aw_addr; // Address to read from
+    logic aw_valid;//asserted by L2 cache when request is ready
+    logic [2:0] aw_prot;
 } ADDRESS_WRITE_PACKET;
 
 typedef struct packed {
-    CACHE_LINE w_data, // Data to write
-    logic w_valid,//asserted by L2 cache when request is ready
-    logic [63:0] w_strb, //will always be all 1s as I am not planning on doing partial writes
+    CACHE_LINE w_data; // Data to write
+    logic w_valid;//asserted by L2 cache when request is ready
+    logic [63:0] w_strb; //will always be all 1s as I am not planning on doing partial writes
 } WRITE_DATA_PACKET;
 
 typedef struct packed {
-    logic b_resp,
-    logic b_valid
+    logic b_resp;
+    logic b_valid;
 } WRITE_RESPONSE_PACKET;
 
 typedef struct packed {
@@ -109,25 +109,25 @@ typedef struct packed {
 } META_PACKET;
 
 typedef struct packed {
-    logic                       valid,
-    ADDR                        addr,
-    logic [`NUM_CORE_BITS-1:0]  core_id,
-    REQ_TYPE_ENUM               req_type
+    logic                       valid;
+    ADDR                        addr;
+    logic [`NUM_CORE_BITS-1:0]  core_id;
+    REQ_TYPE_ENUM               req_type;
 } SNOOP_REQ_PACKET;
 
 typedef struct packed {
-    logic                       valid,
-    ADDR                        addr,
-    CACHE_LINE                  data,
-    logic [`NUM_CORE_BITS-1:0]  core_id
+    logic                       valid;
+    ADDR                        addr;
+    CACHE_LINE                  data;
+    logic [`NUM_CORE_BITS-1:0]  core_id;
 } SNOOP_RESP_PACKET;
 
 typedef struct packed {
-    logic                       valid,
-    ADDR                        addr,
-    CACHE_LINE                  data,
-    logic [`NUM_CORE_BITS-1:0]  core_id,
-    logic                       write_req
+    logic                       valid;
+    ADDR                        addr;
+    CACHE_LINE                  data;
+    logic [`NUM_CORE_BITS-1:0]  core_id;
+    logic                       write_req;
 } MSHR;
 
 /*
