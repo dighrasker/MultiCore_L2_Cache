@@ -48,7 +48,7 @@ typedef enum logic [2:0] {
 } REQ_TYPE_ENUM;
 
 typedef enum logic [1:0] {
-    INAVLID  = 2'b00,
+    INVALID  = 2'b00,
     SHARED     = 2'b01,
     EXCLUSIVE    = 2'b10,
     MODIFIED    = 2'b11
@@ -112,7 +112,7 @@ typedef struct packed {
     logic                       valid;
     ADDR                        addr;
     logic [`NUM_CORE_BITS-1:0]  core_id;
-    REQ_TYPE_ENUM               req_type;
+    OWNER_STATE_ENUM             owner_state;
 } SNOOP_REQ_PACKET;
 
 typedef struct packed {

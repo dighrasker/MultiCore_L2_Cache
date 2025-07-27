@@ -68,7 +68,7 @@ LRU [`NUM_SETS-1:0][`WAYS-1:0] lrus, next_lrus;
 //MSHR signals + storage
 MSHR   [`NUM_MSHRS-1: 0] mshrs, next_mshrs;
 logic [2:0] free_idx, next_free_idx;
-logic [2:0] wait_idx;
+logic [2:0] wait_idx, next_wait_idx;
 logic mshr_exists;
 
 //AXI4 signals
@@ -126,6 +126,9 @@ end
 
 always_comb begin
 
+    int winner;
+    int target_core;
+    logic all_back;
     //--------------------
     //Default values (avoid latching)
     //--------------------
@@ -140,25 +143,26 @@ always_comb begin
     next_aw_packet = aw_packet;
     next_ar_packet = ar_packet;
     next_w_packet = w_packet;
-    write_meta_en = 0'b0;
+    write_meta_en = 1'b0;
     next_lrus = lrus;
+    next_wait_idx = wait_idx;
 
     hit_any = |hit;
-
+    
 
     //------------------------
     //Signals from DRAM
     //------------------------
     if(b_packet.b_valid) begin //Slave confirmed that it got the updated data from master
         next_mshrs[wait_idx].valid = 1'b0;
-        wait_idx = (wait_idx + 1) % `WAYS;
+        next_wait_idx = (wait_idx + 1) % `WAYS;
 
     end
 
     if(r_packet.r_valid) begin //Slave is sending back data that master requested for
         next_mshr[wait_idx].valid = 1'b0;
         //calculate (using lru) which cache line to write to
-        int winner = 0;
+        winner = 0;
         for(int i = 0; i < `WAYS; ++i) begin
             if(lrus[mshr[wait_idx].addr.l2_addr.set_idx][i] == 0) winner = i;
         end
@@ -175,14 +179,14 @@ always_comb begin
         //taking care of the cache line that is beign replaced
         if(read_meta[winner].valid && read_meta[winner].owner_state == MODIFIED) begin //some L1 has a dirty version of the cache line beign evicted
             waiting = 1'b1;
-            int target_core = -1;
+            target_core = -1;
             for (int c = 0; c < `NUM_CORES; c++) begin
                 if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
                     target_core = c;
             end
             snoop_req[target_core].valid = 1'b1;
             snoop_req[target_core].addr = read_meta[winner].addr;
-            snoop_req[target_core].req_type = INVALID;
+            snoop_req[target_core].owner_state = INVALID;
             if (snoop_resp[target_core].valid && (snoop_resp[target_core].addr == read_meta[winner].addr)) begin //after we get back the response
                 waiting = 1'b0;
                 // Give MSHR the updated line
@@ -200,7 +204,7 @@ always_comb begin
                 snoop_req[c].addr = read_meta[winner].addr;
                 snoop_req[c].req_type = INVALID;  
             end
-            logic all_back;
+            
             all_back = snoop_resp[0].valid && snoop_resp[1].valid && snoop_resp[2].valid && snoop_resp[3].valid;        
             if (all_back) begin //after we get back the response
                 waiting = 1'b0;
@@ -217,12 +221,12 @@ always_comb begin
         write_en[winner] = 1'b1;
         read_meta_en[winner] = 1'b1;
         write_addr[winner] = mshr[wait_idx].addr.l2_addr.set_idx;
-        next_write_data[winner] = r_data;
+        next_write_data[winner] = r_packet.r_data;
         write_meta_addr[winner] = mshr[wait_idx].addr.l2_addr.set_idx;
 
 
         //increment wait_idx
-        wait_idx = (wait_idx + 1) % `NUM_MSHRS;
+        next_wait_idx = (wait_idx + 1) % `NUM_MSHRS;
     end
 
     //--------------------
@@ -235,7 +239,7 @@ always_comb begin
             READ:
                 if(hit_any) begin //there was a tag match in L2
                     //which way is actually the tag match
-                    int winner = 0;
+                    winner = 0;
                     for (int i = 0; i < `WAYS; i++) begin
                         if (hit[i]) begin 
                             winner = i;
@@ -248,7 +252,7 @@ always_comb begin
                     //another core has this line in MODIFIED
                     if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
                         waiting = 1'b1;
-                        int target_core = -1;
+                        target_core = -1;
                         for (int c = 0; c < `NUM_CORES; c++) begin
                             if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
                                 target_core = c;
@@ -297,13 +301,13 @@ always_comb begin
                             mshrs[free_idx].core_id = l2_entry_packet.core_id;
                             mshrs[free_idx].req_type = l2_entry_packet.req_type;
 
-                            //initiate ADDRESS READ channel
-                            if(ar_ready) begin
-                                ar_valid = 1'b1;
-                                ar_addr = l2_entry_packet.target_addr;
-                                ar_prot = 3'b000;
-                                l2_exit[l2_entry_packet.core_id].stall = 1'b1;
-                            end
+                            // //initiate ADDRESS READ channel
+                            // if(ar_ready) begin
+                            //     ar_valid = 1'b1;
+                            //     ar_addr = l2_entry_packet.target_addr;
+                            //     ar_prot = 3'b000;
+                            //     l2_exit[l2_entry_packet.core_id].stall = 1'b1;
+                            // end
 
                             next_free_idx = (free_idx + 1) % `NUM_MSHRS;
                         end
@@ -312,7 +316,7 @@ always_comb begin
             WRITE:
                 if(hit_any) begin
                     //which way is actually the tag match
-                    int winner = 0;
+                    winner = 0;
                     for (int i = 0; i < `WAYS; i++) begin
                         if (hit[i]) winner = i;
                     end
@@ -324,7 +328,7 @@ always_comb begin
                     //another core has this line in MODIFIED
                     if ((read_meta[winner].owner_state == MODIFIED) && (read_meta[winner].sharers != (1 << l2_entry_packet.core_id))) begin
                         waiting = 1'b1;
-                        int target_core = -1;
+                        target_core = -1;
                         for (int c = 0; c < `NUM_CORES; c++) begin
                             if (read_meta[winner].sharers[c])   //which core already had this line in MODIFIED
                                 target_core = c;
@@ -373,21 +377,21 @@ always_comb begin
                             mshrs[free_idx].core_id = l2_entry_packet.core_id;
                             mshrs[free_idx].req_type = l2_entry_packet.req_type;
 
-                            //initiate ADDRESS READ channel
-                            if(ar_ready) begin
-                                ar_valid = 1'b1;
-                                ar_addr = l2_entry_packet.target_addr;
-                                ar_prot = 3'b000;
-                                l2_exit[l2_entry_packet.core_id].stall = 1'b1;
-                            end
+                            // //initiate ADDRESS READ channel
+                            // if(ar_ready) begin
+                            //     ar_valid = 1'b1;
+                            //     ar_addr = l2_entry_packet.target_addr;
+                            //     ar_prot = 3'b000;
+                            //     l2_exit[l2_entry_packet.core_id].stall = 1'b1;
+                            // end
 
                             next_free_idx = (free_idx + 1) % `NUM_MSHRS;
                         end
                     end
                 end
 
-            UPGRADE: //can't be an L2 miss on an upgrade, just need to invalidate and update meta data
-                int winner = 0;
+            UPGRADE: begin //can't be an L2 miss on an upgrade, just need to invalidate and update meta data
+                winner = 0;
                 for (int i = 0; i < `WAYS; i++) begin
                     if (hit[i]) winner = i;
                 end
@@ -398,21 +402,20 @@ always_comb begin
                 next_write_meta[winner]     = read_meta[winner];
                 next_write_meta[winner].sharers[l2_entry_packet.core_id] = 1'b1;
                 next_write_meta[winner].owner_state = (next_write_meta[winner].sharers == (1 << l2_entry_packet.core_id)) ? MODIFIED : INVALID;
-
-            EVICTION: //can't be an L2 miss on an eviction, just need to update MESI status and meta data
-                int winner = 0;
+            end
+            EVICT: begin//can't be an L2 miss on an eviction, just need to update MESI status and meta data
+                winner = 0;
                 for (int i = 0; i < `WAYS; i++) begin
                     if (hit[i]) winner = i;
                 end
 
-                write_addr = 
                 next_write_data[winner] = l2_entry_packet.cache_line;
                 write_meta_en[winner] = 1'b1;
                 next_write_meta[winner] = read_meta[winner];
                 next_write_meta[winner].sharers = 0;
                 next_write_meta[winner].dirty = 1'b1;
                 next_write_meta[winner].owner_state = INVALID;
-            default:
+            end
 
 
         endcase
@@ -423,24 +426,24 @@ always_comb begin
     //------------------------
     //Signals to DRAM (MSHR)
     //------------------------
-    if(mshrs[wait_idx].valid && mshr[wait_idx].write_req) begin //mshr wants to write a dirty line to DRAM 
+    if(mshrs[next_wait_idx].valid && mshr[next_wait_idx].write_req) begin //mshr wants to write a dirty line to DRAM 
         if(aw_ready) begin
             aw_packet.aw_valid = 1'b1;
-            aw_packet.aw_addr = mshrs[wait_idx].addr;
+            aw_packet.aw_addr = mshrs[next_wait_idx].addr;
             aw_packet.aw_prot = 1'b0;
         end
 
         if(w_ready) begin
             w_packet.w_valid = 1'b1;
-            w_packet.w_data = mshrs[wait_idx].data;
+            w_packet.w_data = mshrs[next_wait_idx].data;
             w_packet.w_strb = '1;
         end
         
-    end else if (mshrs[wait_idx].valid && ~mshr[wait_idx].write_req) begin //mshr wants to read from DRAM
+    end else if (mshrs[next_wait_idx].valid && ~mshr[next_wait_idx].write_req) begin //mshr wants to read from DRAM
         if(ar_ready) begin
             ar_packet.ar_valid = 1'b1;
-            ar_packet.ar_addr = mshr[wait_idx].ar_addr;
-            ar_prot = 3'b000;
+            ar_packet.ar_addr = mshr[next_wait_idx].ar_addr;
+            ar_packet.ar_prot = 3'b000;
         end
 
     end
@@ -459,10 +462,10 @@ always_ff @(posedge clock) begin
         w_packet = 0;
         wait_idx = 0;
         for (int i = 0; i < `NUM_SETS; ++i) begin
-        for(int j = 0; j , `WAYS; ++j) begin
-            lrus[i][j] = j;
+            for(int j = 0; j < `WAYS; ++j) begin
+                lrus[i][j] = j;
+            end
         end
-    end
     end else if (waiting) begin
         l2_exit_packet = l2_exit_packet;
         snoop_req = snoop_req;
@@ -482,7 +485,7 @@ always_ff @(posedge clock) begin
         ar_packet = next_ar_packet;
         w_packet = next_w_packet;
         lrus = next_lrus;
-        wait_idx = next_way_idx;
+        wait_idx = next_wait_idx;
     end
 
 end

@@ -6,7 +6,7 @@ Warning-[DEBUG_DEP] Option will be deprecated
 Command: vcs -full64 -sverilog +vpi -ntb_opts uvm -debug_all +define+UVM_NO_DEPRECATED \
 -timescale=1ns/1ps -f filelist.f -l compile.log
                          Chronologic VCS (TM)
-      Version V-2023.12-SP2-1_Full64 -- Sat Jul 26 17:01:00 2025
+      Version V-2023.12-SP2-1_Full64 -- Sat Jul 26 20:23:43 2025
 
                     Copyright (c) 1991 - 2024 Synopsys, Inc.
    This software and the associated documentation are proprietary to Synopsys,
@@ -316,20 +316,18 @@ Back to file '/usr/caen/vcs-2023.12-SP2-1/etc/uvm/vcs/uvm_custom_install_vcs_rec
 Parsing design file './verilog/L2Cache.sv'
 Parsing included file 'verilog/sys_defs.svh'.
 Back to file './verilog/L2Cache.sv'.
+Parsing design file './verilog/memDP.sv'
+Parsing design file './verification/testbench.sv'
+Parsing included file '/usr/caen/vcs-2023.12-SP2-1/etc/uvm/uvm_macros.svh'.
+Back to file './verification/testbench.sv'.
 
-Warning-[NZIR] Incorrect size number
-./verilog/L2Cache.sv, 143
-  The specified width is '0'. Nonzero unsigned decimal number is required as 
-  the size constant. This '0' width will be ignored.
+Error-[SFCOR] Source file cannot be opened
+  Source file "sequence_item.sv" cannot be opened for reading due to 'No such 
+  file or directory'.
+  Please fix above issue and compile again.
+  "./verification/testbench.sv", 9
+  Source info: `include "sequence_item.sv"
 
-
-Error-[SE] Syntax error
-  Following verilog source has syntax error :
-  "./verilog/L2Cache.sv", 161: token is 'int'
-          int winner = 0;
-             ^
-  SystemVerilog  keyword 'int' is not expected to be used in this context.
-
-2 warnings
+1 warning
 1 error
-CPU time: .625 seconds to compile
+CPU time: .661 seconds to compile
