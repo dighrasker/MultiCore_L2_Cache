@@ -9,11 +9,12 @@ class cache_env extends uvm_env;
 
     //instantiate classes
     cache_agent agent;
+    cache_scoreboard scb;
 
     //--------------------
     //Class constructor
     //--------------------
-    function new (string name = "cache_env", uvm_component parent = null)
+    function new (string name = "env", uvm_component parent = null)
 
         super.new(name,parent);
 
@@ -25,6 +26,7 @@ class cache_env extends uvm_env;
     //--------------------
     function void build_phase(uvm_phase phase);
         agent = cache_agent::type_id::create("agent", this);
+        scb = cache_scoreboard::type_id::create("scb", this);
         
     endfunction
 

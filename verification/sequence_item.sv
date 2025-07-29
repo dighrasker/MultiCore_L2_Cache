@@ -8,7 +8,7 @@ class cache_packet extends uvm_sequence_item;
 
 
 
-    function new(string name ="our_packet")
+    function new(string name ="cache_packet")
         super.new(name);
 
     endfunction

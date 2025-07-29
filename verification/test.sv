@@ -6,10 +6,11 @@ Description: systemVerilog class that instantiates DUT, uvm environment, and the
 
 class cache_test extends uvm_test;
 
-    `uvm_component_utils(main_test)
+    `uvm_component_utils(cache_test)
 
     //instantiate classes
     cache_env env;
+    cache_sequence cache_seq;
 
 
     //--------------------
@@ -24,7 +25,7 @@ class cache_test extends uvm_test;
     //Build Phase
     //--------------------
     function void build_phase(uvm_phase phase);
-        env = cache_env::type_id::create("", this);
+        env = cache_env::type_id::create("env", this);
 
     endfunction
 
@@ -42,8 +43,10 @@ class cache_test extends uvm_test;
     //Run Phase
     //--------------------
     task run_phase(uvm_phase phase);
-
-
+        cache_seq = cache_sequence::type_id::create("cahce_seq");
+        phase.raise_objection(this);
+        fifo_seq.start(env.agent.sequencer);
+        phase.drop_objection(this);
     endtask
 
 
