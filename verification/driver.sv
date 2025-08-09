@@ -7,6 +7,9 @@ Description: systemVerilog class that instantiates monitor, driver, and sequence
 
 class cache_driver extends uvm_driver;
 
+    virtual cache_interface vif;
+    cache_item trans;
+
 
     `uvm_component_util(cache_driver)
 

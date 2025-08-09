@@ -6,11 +6,11 @@ Description: systemVerilog class that instantiates DUT, uvm environment, and the
 
 class cache_test extends uvm_test;
 
-    `uvm_component_utils(cache_test)
-
     //instantiate classes
-    cache_env env;
-    cache_sequence cache_seq;
+    cache_environment env;
+    virtual cache_sequence vif;
+
+    `uvm_component_utils(cache_test)
 
 
     //--------------------
@@ -25,17 +25,20 @@ class cache_test extends uvm_test;
     //Build Phase
     //--------------------
     function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
         env = cache_env::type_id::create("env", this);
+        uvm_config_db#(cirtual cache_interface)::set(this, "env", "vif", vif);
 
+        if(!uvm_config_db#(virtual cache_interface)::get(this, "", "vif", vif)) begin
+            `uvm_error("build_phase", "Test virtual interface failed")
+        end
     endfunction
 
     //--------------------
-    //Connect Phase
+    //End of Elaboration Phase
     //--------------------
-    function void connect_phase(uvm_phase phase);
-
-
-
+    virtual function void end_of_elaboration();
+        print();
     endfunction
 
 
@@ -43,20 +46,11 @@ class cache_test extends uvm_test;
     //Run Phase
     //--------------------
     task run_phase(uvm_phase phase);
+        cache_sequence cache_seq;
         cache_seq = cache_sequence::type_id::create("cahce_seq");
-        phase.raise_objection(this);
+        phase.raise_objection(this, "Starting main phase", $time);
         fifo_seq.start(env.agent.sequencer);
-        phase.drop_objection(this);
+        phase.drop_objection(this, "Finished cache_seq in main phase");
     endtask
-
-
-
-    //--------------------
-    //Properties
-    //--------------------
-
-
-
-
 
 endclass

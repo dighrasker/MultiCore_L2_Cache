@@ -7,47 +7,38 @@ Description: systemVerilog class that instantiates monitor, driver, and sequence
 
 class cache_agent extends uvm_agent;
 
+    //instantiate class
+    cache_sequencer seqr;
+    cache_driver driv;
+    cache_monitor mon;
 
     `uvm_component_util(cache_agent)
-
-    //instantiate class
-    cache_sequencer sequencer;
-    cache_driver driver;
-    cache_monitor monitor;
 
     //--------------------
     //Class constructor
     //--------------------
-    function new (string name = "cache_agent", uvm_component parent = null)
-
+    function new (string name, uvm_component parent)
         super.new(name,parent);
-
     endfunction
 
     //--------------------
     //Build Phase
     //--------------------
-    function void build_phase(uvm_phase phase);
-        sequencer = cache_agent::type_id::create("sequencer", this);
-        driver = cache_agent::type_id::create("driver", this);
-        monitor = cache_agent::type_id::create("monitor", this);
+    virtual function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        seqr = cache_sequencer::type_id::create("seqr", this);
+        driv = cache_driver::type_id::create("driv", this);
+        mon = cache_monitor::type_id::create("mon", this);
     endfunction
 
     //--------------------
     //Connect Phase
     //--------------------
     function void connect_phase(uvm_phase phase);
-
+        super.connect_phase(phase);
+        driv.seq_item_port.connect(seqr.seq_item_export);
+        uvm_report_info("CACHE_AGENT", "conenct_phase, Connected driver to sequencer");
     endfunction
-    
-
-    //--------------------
-    //Run Phase
-    //--------------------
-    task run_phase(uvm_phase phase);
-
-
-    endtask
 
 
 endclass
