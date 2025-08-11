@@ -26,7 +26,6 @@ module testbench_top;
     bit clock;
     bit reset;
 
-
     //--------------------
     //Clock Generation
     //--------------------
@@ -35,14 +34,12 @@ module testbench_top;
         forever #5 clk = ~clk;
     end
 
-
     //--------------------
     //Reset Generation
     //--------------------
     initial begin
         reset = 0;
         #5 reset = 1;
-
     end
 
     //--------------------

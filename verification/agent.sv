@@ -12,7 +12,12 @@ class cache_agent extends uvm_agent;
     cache_driver driv;
     cache_monitor mon;
 
-    `uvm_component_util(cache_agent)
+    `uvm_component_utils_begin(cache_agent)
+        `uvm_field_object(seqr, UVM_ALL_ON)
+        `uvm_field_object(driv, UVM_ALL_ON)
+        `uvm_field_object(mon, UVM_ALL_ON)
+    `uvm_component_utils_end
+
 
     //--------------------
     //Class constructor

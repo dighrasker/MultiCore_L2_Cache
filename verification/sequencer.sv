@@ -8,40 +8,19 @@ Description: systemVerilog class that instantiates monitor, driver, and sequence
 class cache_sequencer extends uvm_sequencer;
 
 
-    `uvm_component_util(cache_sequencer)
+    `uvm_component_utils(cache_sequencer)
 
 
     //--------------------
     //Class constructor
     //--------------------
-    function new (string name = "cache_sequencer", uvm_component parent = null)
+    function new (string name, uvm_component parent)
 
         super.new(name,parent);
 
     endfunction
 
-    //--------------------
-    //Build Phase
-    //--------------------
-    function void build_phase(uvm_phase phase);
 
-    endfunction
-
-    //--------------------
-    //Connect Phase
-    //--------------------
-    function void connect_phase(uvm_phase phase);
-
-    endfunction
-    
-
-    //--------------------
-    //Run Phase
-    //--------------------
-    task run_phase(uvm_phase phase);
-
-
-    endtask
 
 
 endclass

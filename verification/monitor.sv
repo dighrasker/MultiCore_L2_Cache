@@ -13,7 +13,7 @@ class cache_monitor extends uvm_monitor;
     //analysis port declaration
     uvm_analysis_port#(fifo_seq_item) ap;
 
-    `uvm_component_util(cache_monitor)
+    `uvm_component_utils(cache_monitor)
 
     //--------------------
     //Class constructor
