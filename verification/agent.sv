@@ -7,7 +7,7 @@ Description: systemVerilog class that instantiates monitor, driver, and sequence
 
 class cache_agent extends uvm_agent;
 
-    //instantiate class
+    //instantiate class pointers
     cache_sequencer seqr;
     cache_driver driv;
     cache_monitor mon;

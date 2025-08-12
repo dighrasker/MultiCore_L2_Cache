@@ -37,6 +37,8 @@ module testbench_top;
     //--------------------
     //Reset Generation
     //--------------------
+
+    //toggle reset once to ensure a clean start
     initial begin
         reset = 0;
         #5 reset = 1;

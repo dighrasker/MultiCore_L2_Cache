@@ -31,19 +31,14 @@ class cache_driver extends uvm_driver;
         if(!uvm_config_db#(virtual fifo_interface)::get(this,"","vif", vif))
             `uvm_fatal("NO_VIF", {"virtual interface must be set for:", get_full_name(),".vif"});
     endfunction
-
-    //--------------------
-    //Connect Phase
-    //--------------------
-    function void connect_phase(uvm_phase phase);
-
-    endfunction
     
 
     //--------------------
     //Run Phase
     //--------------------
     task run_phase(uvm_phase phase);
+        super.run_phase(phase);
+       
         forever begin
             seq_item_port.get_next_item(trans);
             drive_task();

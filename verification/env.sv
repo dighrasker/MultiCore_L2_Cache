@@ -5,6 +5,7 @@ Description: systemVerilog class that instantiates scoreboard and agent
 
 class cache_environment extends uvm_env;
 
+    //register the class with the factory for dynamic creation
     `uvm_component_util(cache_environment)
 
     //instantiate classes

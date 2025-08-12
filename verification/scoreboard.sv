@@ -6,6 +6,7 @@ Description:
 
 class cache_scoreboard extends uvm_scoreboard;
 
+    // registering the class with the factory
     `uvm_compound_utils(cache_scoreboard)
 
 
@@ -31,8 +32,8 @@ class cache_scoreboard extends uvm_scoreboard;
         scb_port = new("scb_port", this);
     endfunction
 
-    function void write(fifo_seq_item transaction);
-        que.push_back(transaction);
+    function void write(cache_seq_item trans);
+        que.push_back(trans);
     endfunction
 
     virtual task run_phase(uvm_phase phase);

@@ -22,7 +22,7 @@ class cache_test extends uvm_test;
 
     //--------------------
     //Build Phase
-    //--------------------rte
+    //--------------------
     function void build_phase(uvm_phase phase);
         super.build_phase(phase);
         env = cache_env::type_id::create("env", this);
@@ -45,11 +45,15 @@ class cache_test extends uvm_test;
     //Run Phase
     //--------------------
     task run_phase(uvm_phase phase);
+    
         cache_sequence cache_seq;
-        cache_seq = cache_sequence::type_id::create("cahce_seq");
+        cache_seq = cache_sequence::type_id::create("cache_seq");
+
+        //objections extend the phase until their task is complete
         phase.raise_objection(this, "Starting main phase", $time);
-        fifo_seq.start(env.agent.sequencer);
+        cache_seq.start(env.agent.sequencer);
         phase.drop_objection(this, "Finished cache_seq in main phase");
+
     endtask
 
 endclass
