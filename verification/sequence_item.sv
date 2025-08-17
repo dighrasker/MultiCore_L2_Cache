@@ -29,7 +29,7 @@ class cache_packet extends uvm_sequence_item;
     //-----------------------
     // Constructor
     //-----------------------
-    function new(string name ="cache_packet")
+    function new(string name = "cache_packet")
         super.new(name);
     endfunction
 
@@ -128,7 +128,6 @@ class cache_packet extends uvm_sequence_item;
         this.core_id    = other.core_id;
         this.addr       = other.addr;
         this.wdata      = other.wdata;
-        this.think_cycles = other.think_cycles;
         super.do_copy(rhs);
     endfunction
 
