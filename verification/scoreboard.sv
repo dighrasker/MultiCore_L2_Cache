@@ -1,57 +1,61 @@
 /*========================================
 Filename: scoreboard.sv
-Description: 
+Description: Minimal scoreboard with a tiny reference model.
 ==========================================*/
 
+`include "uvm_macros.svh"
+import uvm_pkg::*;
+`include "sys_defs.svh"
 
 class cache_scoreboard extends uvm_scoreboard;
 
-    // registering the class with the factory
-    `uvm_compound_utils(cache_scoreboard)
+  `uvm_component_utils(cache_scoreboard)
 
+  // Monitor pushes observed transactions here (we use cache_packet)
+  uvm_analysis_imp#(cache_packet, cache_scoreboard) scb_port;
 
-    uvm_analysis_imp#(cache_seq_item, cache_scoreboard) scb_port;
+  // simple ref model: expected cache lines by 32-bit address
+  CACHE_LINE exp_mem [int unsigned];  // key = addr.addr
 
-    cache_seq_item que[$];
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
 
-    cache_seq_item trans;
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    scb_port = new("scb_port", this);
+  endfunction
 
-    //--------------------
-    //Class constructor
-    //--------------------
-    function new(string name, uvm_component parent);
-        super.new(name,parent);
-    endfunction
+  //   - WRITE request: req_type==WRITE, addr set, wdata = write data
+  //   - READ  response: req_type==READ,  addr set, wdata = observed rdata
+  function void write(cache_packet tr);
+    int unsigned a = tr.addr.addr;
 
+    case (tr.req_type)
+      WRITE: begin
+        exp_mem[a] = tr.wdata;
+        `uvm_info("SCB", $sformatf("REF WRITE: a=0x%08h data=<512b>", a), UVM_LOW)
+      end
 
-    //--------------------
-    //Build phase
-    //--------------------
-    function void build_phase(uvm_phase phase);
-        super.build_phase(phase);
-        scb_port = new("scb_port", this);
-    endfunction
-
-    function void write(cache_seq_item trans);
-        que.push_back(trans);
-    endfunction
-
-    virtual task run_phase(uvm_phase phase);
-        forever begin
-            wait(que.size()>0);
-            trans = que.pop_front();
-
-            //WRITE
-            if(trans.wr==1) begin
-                mem.push_back(trans.data_in);
-            end
-
-            //READ
-            if(trans.rd == 1 || (read_delay_clk != 0))
-            
-        
+      READ: begin
+        // If address never written, assume zero line (very simple model).
+        CACHE_LINE expected = exp_mem.exists(a) ? exp_mem[a] : '0;
+        if (tr.wdata !== expected) begin
+          `uvm_error("SCB",
+            $sformatf("READ MISMATCH a=0x%08h exp!=got", a))
+        end else begin
+          `uvm_info("SCB",
+            $sformatf("READ MATCH a=0x%08h", a), UVM_LOW)
         end
+      end
 
-    endtask
+      default: begin
+        // EVICT/UPGRADE (no ref-state needed for this minimal model)
+        `uvm_info("SCB",
+          $sformatf("IGNORING req_type=%0s a=0x%08h",
+                    tr.req_type.name(), a), UVM_DEBUG)
+      end
+    endcase
+  endfunction
 
 endclass

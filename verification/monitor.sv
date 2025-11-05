@@ -1,54 +1,49 @@
 /*========================================
 Filename: monitor.sv
-Description: systemVerilog class that 
+Description: Minimal monitor.
 ==========================================*/
 
-
-`define MON_IF vif.MONITOR.monitor_cb
+`include "uvm_macros.svh"
+import uvm_pkg::*;
+`include "sys_defs.svh"
 
 class cache_monitor extends uvm_monitor;
-    
-    virtual cache_interface vif;
 
-    //analysis port declaration
-    uvm_analysis_port#(fifo_seq_item) ap;
+  `uvm_component_utils(cache_monitor)
 
-    `uvm_component_utils(cache_monitor)
+  virtual cache_interface.MONITOR vif;
 
-    //--------------------
-    //Class constructor
-    //--------------------
-    function new (string name, uvm_component parent)
-        super.new(name,parent);
-        ap = new("ap", this);
-    endfunction
+  // analysis port sends observed transactions to scoreboard
+  uvm_analysis_port#(cache_packet) ap;
 
-    //--------------------
-    //Build Phase
-    //--------------------
-    function void build_phase(uvm_phase phase)
-        super.build_phase(phase);
-        if(!uvm_config_db#(virtual cache_interface)::get(this, "", "vif", vif)) begin
-            `uvm_error("build_phase", "No virtual interface specified for this monitor instance")
-        end
-    endfunction
-    
+  function new (string name, uvm_component parent);
+    super.new(name, parent);
+    ap = new("ap", this);
+  endfunction
 
-    //--------------------
-    //Run Phase
-    //--------------------
-    virtual task run_phase(uvm_phase phase);
-        super.run_phase(phase);
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    if (!uvm_config_db#(virtual cache_interface.MONITOR)::get(this, "", "vif", vif)) begin
+      `uvm_fatal("NO_VIF", "No virtual interface.MONITOR for monitor")
+    end
+  endfunction
 
-        forever begin
-            cache_seq_item trans;
-            trans = cache_seq_item::type_id::create("trans");
+  task run_phase(uvm_phase phase);
+    super.run_phase(phase);
 
-            
+    forever begin
+      @(vif.monitor_cb);  // sample once per cycle via clocking block
 
-        end
+      L2_EXIT_PACKET resp = vif.monitor_cb.l2_exit_packet;
 
-    endtask
+      cache_packet pkt = cache_packet::type_id::create("mon_pkt", this);
+      pkt.req_type = READ;
+      pkt.addr     = resp.target_addr;
+      pkt.core_id  = '0;                   // not critical for SCB compare
+      pkt.wdata    = resp.cache_line;      // observed read data
 
+      ap.write(pkt);
+    end
+  endtask
 
 endclass
