@@ -23,7 +23,7 @@ import uvm_pkg::*;
 
 
 module testbench_top;
-    bit clock;
+    bit clk;
     bit reset;
 
     //--------------------
@@ -59,6 +59,7 @@ module testbench_top;
         //To/From L1 Cache
         .l2_entry_packet(in.l2_entry_packet), //seq
         .l2_exit_packet(in.l2_exit_packet), //seq
+        .l2_exit_valid(in.l2_exit_valid),
         .snoop_resp(in.snoop_resp), //seq
         .snoop_req(in.snoop_req), //seq
         //Address Read: Master tells slave what address it is trying to read
@@ -83,7 +84,7 @@ module testbench_top;
     //Config Db
     //--------------------
     initial begin
-        uvm_config_db#(virtual cache_instance)::set(null,"*", "vif", in);
+        uvm_config_db#(virtual cache_interface.DRIVER)::set(null,"*", "vif", in);
     end
     
 

@@ -6,6 +6,7 @@ module L2Cache #() (
 //-------------To/From L1 Cache------------//
     input          L2_ENTRY_PACKET l2_entry_packet, //seq
     output          L2_EXIT_PACKET [`NUM_CORES-1: 0] l2_exit_packet, //seq
+    output                  logic  [`NUM_CORES-1: 0] l2_exit_valid,
     input        SNOOP_RESP_PACKET [`NUM_CORES-1: 0] snoop_resp, //seq
     output        SNOOP_REQ_PACKET [`NUM_CORES-1: 0] snoop_req, //seq
 //-------------To/From DRAM (AXI4)----------------//

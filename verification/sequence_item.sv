@@ -77,8 +77,8 @@ class cache_packet extends uvm_sequence_item;
 
         // wdata: split into 32-bit chunks to avoid tool limits.
         for (int i = 0; i < `LINE_SIZE_BITS; i += 32) begin
-        int unsigned chunk = wdata[i +: 32];
-        packer.pack_field_int(chunk, 32);
+            int unsigned chunk = wdata[i +: 32];
+            packer.pack_field_int(chunk, 32);
         end
     endfunction
 
