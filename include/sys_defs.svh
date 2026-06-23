@@ -4,7 +4,7 @@
 `timescale 1ns/100ps
 
 `define NUM_CORES 4
-`define NUM_CORE_BITS $clog2(NUM_CORES)
+`define NUM_CORE_BITS $clog2(`NUM_CORES)
 
 
 //L2 Cache size parameters
@@ -137,3 +137,5 @@ meta_packet.owner_state
 • 10 = Exclusive (exactly one sharer, clean)
 • 11 = Modified (exactly one sharer, dirty).
 */
+
+`endif //SYS_DEFS_SVH
