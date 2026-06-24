@@ -64,7 +64,6 @@ module tb();
         r_packet        = '0;
         b_packet        = '0;
         ar_ready        = 1'b0;
-        r_ready         = 1'b0;
         aw_ready        = 1'b0;
         w_ready         = 1'b0;
 

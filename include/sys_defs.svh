@@ -11,14 +11,14 @@
 `define CACHE_SIZE_BYTES 512000
 `define WAYS 8
 `define LINE_SIZE_BYTES 64
-`define SET_SIZE_BYTES `WAYS * `LINE_SIZE_BYTES
-`define NUM_SETS `CACHE_SIZE_BYTES / `SET_SIZE_BYTES
+`define SET_SIZE_BYTES (`WAYS * `LINE_SIZE_BYTES)
+`define NUM_SETS (`CACHE_SIZE_BYTES / `SET_SIZE_BYTES)
 `define NUM_SETS_BITS $clog2(`NUM_SETS)
 `define LINE_SIZE_BITS (`LINE_SIZE_BYTES * 8)
-`define L2_TAG_WIDTH 32 - $clog2(`NUM_SETS) - $clog2(`LINE_SIZE_BITS)
-`define META_WIDTH 1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH
+`define L2_TAG_WIDTH (32 - $clog2(`NUM_SETS) - $clog2(`LINE_SIZE_BITS))
+`define META_WIDTH (1 + 1 + `NUM_CORES + 2 + `L2_TAG_WIDTH)
 `define NUM_MSHRS 8
-`define WAY_IDX_BITS $clog2(`WAYS)
+`define WAY_IDX_BITS ($clog2(`WAYS))
 
 typedef logic [`WAY_IDX_BITS-1:0] LRU;
 typedef logic [`NUM_SETS_BITS-1:0] SET_IDX;

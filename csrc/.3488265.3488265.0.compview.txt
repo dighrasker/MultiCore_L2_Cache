@@ -1,0 +1,7 @@
+Command exited with non-zero status 255
+{"vcs1":{"timestamp_begin":1782270689.390483938, "rt":188.54, "ut":121.09, "st":46.88}}
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1782270688.849542258}
+{"VCS_COMP_START_TIME": 1782270688.849542258}
+{"VCS_COMP_END_TIME": 1782270878.377719719}
+{"VCS_USER_OPTIONS": "-sverilog -debug_acc+all +incdir+verilog +incdir+include verilog/L2Cache.sv verilog/memDP.sv verilog/mshr.sv verification/tb_initial.sv -top tb -o sim.out"}
+{"vcs1": {"peak_mem": 9029404}}

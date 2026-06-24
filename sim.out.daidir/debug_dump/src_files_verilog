@@ -1,0 +1,5 @@
+/home/dhruvdi/MultiCore_L2_Cache/include/sys_defs.svh
+/home/dhruvdi/MultiCore_L2_Cache/verification/tb_initial.sv
+/home/dhruvdi/MultiCore_L2_Cache/verilog/L2Cache.sv
+/home/dhruvdi/MultiCore_L2_Cache/verilog/memDP.sv
+/home/dhruvdi/MultiCore_L2_Cache/verilog/mshr.sv

@@ -1,0 +1,5 @@
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1782270652.274567338}
+{"VCS_COMP_START_TIME": 1782270652.274567338}
+{"VCS_COMP_END_TIME": 1782270660.254843253}
+{"VCS_USER_OPTIONS": "-sverilog -debug_acc+all +incdir+verilog +incdir+include verilog/L2Cache.sv verilog/memDP.sv verilog/mshr.sv verification/tb_initial.sv -top tb -o sim.out"}
+{"vcs1": {"peak_mem": 828516}}

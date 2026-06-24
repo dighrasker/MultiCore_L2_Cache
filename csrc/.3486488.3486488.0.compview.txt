@@ -1,0 +1,6 @@
+Command terminated by signal 9
+{"vcs1":{"timestamp_begin":1782270441.252325888, "rt":151.38, "ut":16.92, "st":32.93}}
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1782270440.713961256}
+{"VCS_COMP_START_TIME": 1782270440.713961256}
+{"VCS_COMP_END_TIME": 1782270593.070505926}
+{"VCS_USER_OPTIONS": "-sverilog -debug_acc+all +incdir+verilog +incdir+include verilog/L2Cache.sv verilog/memDP.sv verilog/mshr.sv verification/tb_initial.sv -top tb -o sim.out"}

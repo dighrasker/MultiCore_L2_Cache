@@ -1,0 +1,9 @@
+{"vcs1":{"timestamp_begin":1782271074.724264493, "rt":2.27, "ut":0.38, "st":0.17}}
+{"vcselab":{"timestamp_begin":1782271077.115551857, "rt":1.64, "ut":0.19, "st":0.11}}
+{"link":{"timestamp_begin":1782271078.894724148, "rt":1.10, "ut":0.14, "st":0.12}}
+{"SNPS_VCS_INTERNAL_ROOT_START_TIME": 1782271074.303717569}
+{"VCS_COMP_START_TIME": 1782271074.303717569}
+{"VCS_COMP_END_TIME": 1782271080.650529314}
+{"VCS_USER_OPTIONS": "-sverilog -debug_acc+all +incdir+verilog +incdir+include verilog/L2Cache.sv verilog/memDP.sv verilog/mshr.sv verification/tb_initial.sv -top tb -o sim.out"}
+{"vcs1": {"peak_mem": 319964}}
+{"vcselab": {"peak_mem": 176984}}
